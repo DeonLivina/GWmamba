@@ -21,9 +21,7 @@ import pandas as pd
 import torch
 from torch.utils.data import TensorDataset, DataLoader, WeightedRandomSampler
 
-# =====================================================
 # Config
-# =====================================================
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "full_data"
 
@@ -75,9 +73,9 @@ WINDOW = 1.0
 NORMALIZE = False
 
 
-# -----------------------
-# Temporal test holdout + special-event tracking
-# -----------------------
+
+# Temporal test holdout and special-event tracking
+
 def utc_to_gps(year, month, day, hour, minute, second, leap_offset=18):
     """Convert a UTC timestamp to GPS time. `leap_offset` is 18s for dates from 2017-01-01 onward."""
     gps_epoch = datetime(1980, 1, 6, tzinfo=timezone.utc)

@@ -1,11 +1,9 @@
-"""Dataloader for the big_model 3-class (background/glitch/signal) GW model,
-combining H1 and L1 data with detector as a second label.
-
+"""
 Every sample carries two labels:
   y_type:     0=background, 1=glitch, 2=signal
   y_detector: 0=H1, 1=L1
 
-Sampling strategy (L1 has far fewer usable examples than H1 for every class,
+Sampling strategy (L1 has fewer usable examples than H1 for every class,
 since fewer witness channels/strain chunks have been downloaded for it so far):
   - background: exactly N_BG_PER_DETECTOR samples from EACH detector
                 (H1 + L1 -> N_BG_PER_DETECTOR * 2 total)
@@ -15,9 +13,7 @@ since fewer witness channels/strain chunks have been downloaded for it so far):
                 N_SIGNAL_TOTAL
 
 Only witness channels present in BOTH detectors' files are kept, so H1 and L1
-samples can be concatenated into one witness tensor. Right now that's just
-LSC-POP_A_LF_OUT_DQ, since L1 only has that one channel downloaded so far --
-update L1_WITNESS_CHANNELS below as more L1 aux channels arrive.
+samples can be concatenated into one witness tensor.
 """
 
 import os
@@ -50,18 +46,19 @@ DETECTOR_LABELS = {d: i for i, d in enumerate(DETECTORS)}
 DETECTOR_NAMES = {i: d for d, i in DETECTOR_LABELS.items()}
 
 H1_WITNESS_CHANNELS = [
-    "ASC-CHARD_P_OUT_DQ",
-    "ASC-Y_TR_B_PIT_OUT_DQ",
     "ISI-HAM4_BLND_GS13Z_IN1_DQ",
     "LSC-POP_A_LF_OUT_DQ",
     "LSC-REFL_A_LF_OUT_DQ",
     "LSC-REFL_A_RF45_I_ERR_DQ",
     "LSC-REFL_A_RF9_Q_ERR_DQ",
-    "PEM-CS_ACC_LVEAFLOOR_XCRYO_Z_DQ",
-    "SUS-SR3_M3_OPLEV_PIT_OUT_DQ",
 ]
+
 L1_WITNESS_CHANNELS = [
     "LSC-POP_A_LF_OUT_DQ",
+    "PEM-EY_VMON_ETMY_ESDPOWER24_DQ",
+    "ISI-HAM6_BLND_GS13RZ_IN1_DQ",
+    "PEM-EY_ACC_BEAMTUBE_MAN_Y_DQ",
+    "ASC-CHARD_P_OUT_DQ",
 ]
 
 ACTIVE_WITNESS_ORDER = [c for c in H1_WITNESS_CHANNELS if c in L1_WITNESS_CHANNELS]

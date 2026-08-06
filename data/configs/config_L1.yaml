@@ -1,0 +1,105 @@
+general:
+    type: BBH
+    seed: 42
+    num_per_class: 64      # examples generated per class (signal/glitch/background)
+    batch_size: 64
+    waveform_duration: 1    # duration of the analysis window [s]
+    sample_rate: 4096
+    right_pad: 0.1          # coalescence point [s] from right edge of window, before jitter
+    time_jitter: 1.0        # +/- random time shift [s] requested; injections._time_jitter
+                            # clips this to whatever room is actually available around
+                            # right_pad (respecting a small edge guard), so setting this
+                            # larger than that room (as here) makes the edge guard the
+                            # binding constraint instead of this value -- i.e. the
+                            # coalescence point ends up ~uniform across the window
+                            # (roughly [0.05s, 0.95s]) rather than clustered near the
+                            # right edge. (signal and glitch jittered independently)
+    f_min: 20
+    f_max: 2048
+    f_ref: 20
+    ifos: ['L1']            # single strain detector for now
+    run: O3a                # GWOSC observing run for background (see load_data.py)
+    max_background_seconds: 4096   # cap on how much background to download
+
+# --- CBC (BBH) signal prior -------------------------------------------------
+waveform:
+    chirp_mass:
+        func: ml4gw.distributions.PowerLaw
+        args: [10, 100, -2.35]
+    mass_ratio:
+        func: torch.distributions.Uniform
+        args: [0.125, 0.999]
+    chi1:
+        func: torch.distributions.Uniform
+        args: [-0.999, 0.999]
+    chi2:
+        func: torch.distributions.Uniform
+        args: [-0.999, 0.999]
+    distance:
+        func: ml4gw.distributions.PowerLaw
+        args: [100, 1000, 2]
+    phic:
+        func: ml4gw.distributions.DeltaFunction
+        args: [0]
+    inclination:
+        func: ml4gw.distributions.Sine
+
+# --- whitening --------------------------------------------------------------
+whiten:
+    fftlength: 2
+    average: median
+    overlap: null
+    psd_length: 16
+    fduration: 2
+
+# --- signal SNR reweighting -------------------------------------------------
+snr_reweighting:
+    func: ml4gw.distributions.PowerLaw
+    args: [12, 100, -3]
+
+# --- glitch (SineGaussian blip) ---------------------------------------------
+# A blip glitch is a short, broadband transient (teardrop in time-frequency). It is
+# well modelled by a *low-Q* sine-Gaussian: low quality factor -> few cycles ->
+# short and broadband (fractional bandwidth ~ 1/Q). Higher Q would give a long,
+# narrowband tone (whistle-like), which is NOT a blip.
+glitch:
+    prior:
+        quality:                    # low Q -> short, broadband blip
+            func: torch.distributions.Uniform
+            args: [2.0, 6.0]
+        frequency:                  # central frequency [Hz]
+            func: torch.distributions.Uniform
+            args: [40.0, 400.0]
+        hrss:                       # amplitude placeholder; overwritten by SNR reweighting
+            func: ml4gw.distributions.DeltaFunction
+            args: [1.0]
+        phase:
+            func: torch.distributions.Uniform
+            args: [0.0, 6.283185307]
+        eccentricity:               # 0 -> pure plus polarisation (nonzero)
+            func: ml4gw.distributions.DeltaFunction
+            args: [0.0]
+    snr:
+        strain:                     # how loud the glitch is in the strain channel
+            func: ml4gw.distributions.PowerLaw
+            args: [12, 100, -3]
+        witness:                    # how loud it is in the (well-measured) witness
+            func: torch.distributions.Uniform
+            args: [15.0, 50.0]
+
+# --- witness channel --------------------------------------------------------
+# The blip is injected into the strain channel; the witness glitch is *derived* from
+# it (witness.derive_witness): the strain blip is passed through the witness sensor's
+# band-limited transfer function, optionally delayed, and mixed with independent
+# sensor noise. `alpha` sets how much of the witness is coherent with the strain.
+witness:
+    noise:
+        color: white                # 'white' or 'powerlaw' (with `index`)
+    coupling:
+        type: lti                   # LTI Butterworth coupling
+        alpha: 0.9                  # fraction of witness-glitch power coherent w/ strain
+        lag: 0.0                    # propagation delay strain->witness [s] (e.g. 0.001)
+        filter:                     # witness sensor band (sub-band of the blip)
+            btype: bandpass
+            cutoff: [20, 300]
+            order: 4

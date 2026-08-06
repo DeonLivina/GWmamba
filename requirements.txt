@@ -1,0 +1,26 @@
+# Core
+torch
+lightning
+mamba-ssm
+
+# Data / numerics
+numpy
+pandas
+scipy
+h5py
+PyYAML
+
+# GW-specific
+gwpy
+astropy
+ml4gw
+
+# Viz
+matplotlib
+seaborn
+
+# Experiment tracking
+wandb
+
+# Misc
+tqdm

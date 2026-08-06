@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+
+# Generated data (see README.md "Data" section for how to regenerate)
+full_data/
+triggers_H1/
+triggers_L1/
+
+# Training artifacts
+checkpoints_*/
+ckpt_*/
+lightning_logs/
+wandb/
+*.ckpt
+*.pt
+
+# Results/plots produced by train/ablation scripts (regenerate by rerunning)
+plots/
+plots_*/
+ablation_*/
+comparison_*/
+confusion_*.png
+*_results.csv
+
+# Editor/OS cruft
+.DS_Store
+.vscode/
+.idea/

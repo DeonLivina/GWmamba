@@ -25,9 +25,8 @@ import pandas as pd
 import torch
 from torch.utils.data import TensorDataset, DataLoader, WeightedRandomSampler
 
-# =====================================================
 # Config
-# =====================================================
+
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "full_data"
 

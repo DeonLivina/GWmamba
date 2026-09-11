@@ -2,10 +2,8 @@
 """
 Walks every raw Omicron strain trigger for one detector and, for each one,
 checks whether at least one witness channel has a trigger within its
-HVeto-optimized `twin` time window of its peak `time` (bidirectional).
+HVeto-optimized `twin` time window of its peak `time`.
 
-Restricted strictly to your specified base witness channels for H1 and L1,
-while pulling the corresponding HVeto 'twin' window values from the tuning records.
 """
 
 import glob
@@ -14,13 +12,12 @@ from pathlib import Path
 
 import pandas as pd
 
-# ============================================================
 # CONFIG
-# ============================================================
+
 
 DETECTOR = "L1"  # or "L1"
 
-# SNR cut configuration (set to None or 0 to disable)
+# SNR cut configuration. Currently set to the lowest SNR value suggested by Hveto outputs
 STRAIN_SNR_THRESHOLD = 7  # e.g., 6.0
 WITNESS_SNR_THRESHOLD = 7 # e.g., 6.0
 
@@ -31,7 +28,7 @@ TRIGGER_DIR = {
     "L1": ROOT / "triggers_L1",
 }[DETECTOR]
 
-# HVeto 'twin' time windows (in seconds) for your explicitly chosen channels:
+# HVeto 'twin' time windows (in seconds) for your explicitly chosen channels. The lowest is time window value is selected to ensure coincidence
 WITNESS_TOLERANCES = {
     # H1 Channels
     "ISI-HAM4_BLND_GS13Z_IN1_DQ": 0.80,  # from H1 May 2 records
@@ -69,9 +66,8 @@ OUTPUT_DIR = ROOT / "full_data" / DETECTOR
 OUT_CSV = OUTPUT_DIR / "strain_witness_coincidence.csv"
 
 
-# ============================================================
 # HELPERS
-# ============================================================
+
 
 def find_trigger_csv(trigger_dir, detector, channel):
     pattern = str(trigger_dir / f"{detector}_{channel}_*.csv")
@@ -83,9 +79,8 @@ def find_trigger_csv(trigger_dir, detector, channel):
     return matches[0]
 
 
-# ============================================================
 # MAIN
-# ============================================================
+
 
 strain_csv = find_trigger_csv(TRIGGER_DIR, DETECTOR, "GDS-CALIB_STRAIN")
 print(f"{DETECTOR}: loading strain triggers from {strain_csv}")

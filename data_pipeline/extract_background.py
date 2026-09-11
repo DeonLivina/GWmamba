@@ -1,36 +1,5 @@
 #!/usr/bin/env python3
-"""Extract & whiten real background windows from big_model's layout.
-
-Background candidates come from full_data/<DETECTOR>/background_triggers.csv
-(built by bg_triggers.py: 1s windows tiled into the gaps between raw Omicron
-strain triggers). This script adds a second, wider guard on top of that: a
-candidate is also dropped if its full whitening footprint (16s PSD context +
-pad + kernel + pad) overlaps any glitch longer than MAX_GLITCH_DURATION from
-the detector's raw Omicron strain triggers -- a long glitch sitting inside
-the 16s PSD-estimation lookback would bias that window's PSD even if it's
-nowhere near the 1s kernel itself.
-
-NOTE: this guard is intentionally loose (MAX_GLITCH_DURATION is large). It
-exists only to catch the worst case (e.g. a lock-loss transient sitting in
-the PSD lookback) -- since background windows aren't selected or vetted using
-the auxiliary witness channels here, moderate PSD contamination from an
-ordinary glitch is an acceptable tradeoff against discarding a large chunk of
-an otherwise-fine candidate pool. Tighten MAX_GLITCH_DURATION back down if
-that assumption changes.
-
-Unlike the old O3_data pipeline, this data isn't split into fixed calendar
-days that line up across channels -- strain comes in one manifest of
-4096s chunks, and each witness channel has its own, independently-sized
-chunking (H1's 9 channels are chunked into 3 ~86400s pieces; L1's 1 channel
-so far is chunked into 9 ~28800s "reduced" pieces). So instead of opening
-one shared "day" of files, every channel (strain included) gets its own
-manifest of (gps_start, gps_end, path) built by scanning data/, and each
-candidate window looks up whichever chunk file actually covers it,
-independently per channel. Selection runs over the entire surviving
-candidate pool -- no day-based stratification (there's no day structure to
-stratify over anymore) and no upfront cap (most candidates get discarded
-downstream in whiten_block as bad strain/witness/bounds, so capping before
-extraction just throws away good candidates before they get a chance).
+"""Extract & whiten real background windows 
 
 Set DETECTOR below and rerun per detector.
 """
@@ -48,15 +17,13 @@ from gwpy.timeseries import TimeSeries
 
 from ml4gw.transforms import SpectralDensity, Whiten
 
-
-# -----------------------
 # Config
-# -----------------------
+
 DETECTOR = "H1"  # or "L1"
 
 ROOT = Path(__file__).resolve().parent.parent
 
-STRAIN_DIR = ROOT / "data" / "og"
+STRAIN_DIR = ROOT / "data" / "strain_data"
 WITNESS_DIR = ROOT / "data" / "witness_data"
 
 TRIGGER_DIR = {
@@ -87,14 +54,13 @@ trigger_csv = OUTPUT_DIR / "background_triggers.csv"
 output_file = OUTPUT_DIR / "whitened_background_full.h5"
 
 
-# -----------------------
+
 # Parameters
-# -----------------------
+
 window = 1.0
 
 target_sample_rate = 4096
 
-# --- whitening (matches dataset/configs/config_<DETECTOR>.yaml's `whiten:` block) ---
 WHITEN_FFTLENGTH = 2.0
 WHITEN_OVERLAP = None
 WHITEN_AVERAGE = "median"
@@ -103,23 +69,16 @@ WHITEN_FDURATION = 2.0
 HIGHPASS = 20.0
 
 pad_seconds = WHITEN_FDURATION / 2.0
+MAX_GLITCH_DURATION = 0                # all gliches are excluded in the psd estimate
 
-# Glitches longer than this also guard the wider PSD-lookback footprint (see
-# module docstring). Loosened on purpose -- only very long glitches (e.g. a
-# lock-loss) get excluded now, since we don't select/vet backgrounds using the
-# witness channels here and don't need a pristine PSD to that degree.
-MAX_GLITCH_DURATION = 8.0   # seconds
-
-# Cap on number of background samples to extract. None = run every surviving
-# candidate (after the long-glitch guard) through extraction.
 n_samples = None
 
 random_seed = 42
 
 
-# -----------------------
+
 # Utilities
-# -----------------------
+
 def clean_non_numerical(data):
     data = np.asarray(data, dtype=np.float64)
     bad = ~np.isfinite(data)
@@ -156,9 +115,6 @@ def build_transforms(rate):
 
 
 def whiten_block(block, rate, target_rate, transforms, psd_len_native, length):
-    """Returns (result, reason). result is None on failure, and reason is a
-    short string categorizing why -- used to break down bad_strain/bad_witness
-    counts by cause instead of collapsing everything into one number."""
     block = np.asarray(block, dtype=np.float64)
 
     if len(block) == 0:
@@ -263,18 +219,17 @@ def diagnose_bounds_failure(manifest, seg_start, seg_end):
     return "other"
 
 
-# -----------------------
 # Load background candidates
-# -----------------------
+
 print(f"Loading background candidates for {DETECTOR}")
 triggers = pd.read_csv(trigger_csv)
 candidates = triggers["gps_start"].to_numpy()
 print("Total candidate windows:", len(candidates))
 
 
-# -----------------------
+
 # Strain trigger table, for the long-glitch PSD-footprint exclusion
-# -----------------------
+
 def find_strain_trigger_csv(trigger_dir, detector):
     pattern = str(trigger_dir / f"{detector}_GDS-CALIB_STRAIN_*.csv")
     matches = sorted(glob.glob(pattern))
@@ -291,7 +246,6 @@ glitch_duration = glitch_tend - glitch_tstart
 long_mask = glitch_duration > MAX_GLITCH_DURATION
 long_tstart = glitch_tstart[long_mask]
 long_tend = glitch_tend[long_mask]
-print(f"long glitches (> {MAX_GLITCH_DURATION}s):", len(long_tstart))
 
 footprint_start = candidates - WHITEN_PSD_LENGTH - pad_seconds
 footprint_end = candidates + window + pad_seconds
@@ -318,9 +272,9 @@ else:
     print(f"selected for extraction: {len(candidates)} (all surviving candidates)")
 
 
-# -----------------------
+
 # Manifests
-# -----------------------
+
 print("\nIndexing strain chunks")
 strain_manifest = load_strain_manifest(STRAIN_DIR, DETECTOR)
 print(f"Found {len(strain_manifest)} strain chunks")
@@ -332,26 +286,22 @@ for channel in WITNESS_CHANNELS:
     print(f"  {channel}: {len(witness_manifests[channel])} chunks")
 
 
-# -----------------------
-# Dimensions & Rate Inspection Printout
-# -----------------------
-seq_len = int(window * target_sample_rate)
 
-print("\n========================================")
+# Dimensions & Rate Inspection Printout
+
+seq_len = int(window * target_sample_rate)
 print(f"INDIVIDUALLY READ NATIVE SAMPLE RATES ({DETECTOR})")
-print("========================================")
+
 # Print rates dynamically for each unique file/chunk found
 for idx, (g_start, g_end, rate, path) in enumerate(strain_manifest):
     print(f"Strain Chunk {idx} ({Path(path).name}): {rate} Hz")
 for channel in WITNESS_CHANNELS:
     for idx, (g_start, g_end, rate, path) in enumerate(witness_manifests[channel]):
         print(f"Witness [{channel}] Chunk {idx} ({Path(path).name}): {rate} Hz")
-print("========================================\n")
 
 
-# -----------------------
 # Storage
-# -----------------------
+
 from collections import Counter
 
 strain_out, witness_out, gps_out = [], [], []
@@ -374,10 +324,9 @@ for manifest in witness_manifests.values():
 for rate in all_rates:
     transforms[rate] = build_transforms(rate)
 
-
-# -----------------------
+-
 # Extraction
-# -----------------------
+
 for win_start in tqdm(candidates, desc=DETECTOR):
     segment_start = win_start - WHITEN_PSD_LENGTH - pad_seconds
     segment_end = win_start + window + pad_seconds
@@ -408,9 +357,8 @@ for win_start in tqdm(candidates, desc=DETECTOR):
         bad_strain_reasons[strain_reason] += 1
         continue
 
-    # -----------------------
     # Witness
-    # -----------------------
+   
     w_samples = []
     ok = True
 
@@ -460,9 +408,8 @@ for f in witness_file_cache.values():
     f.close()
 
 
-# -----------------------
 # Report
-# -----------------------
+
 print("\nFinished")
 print("Valid samples:", len(gps_out))
 print("Bad strain:", bad_strain)
@@ -491,9 +438,9 @@ if len(gps_out) == 0:
     raise RuntimeError("No samples produced. Check GPS alignment or triggers.")
 
 
-# -----------------------
+
 # Save
-# -----------------------
+
 strain_out = np.asarray(strain_out, dtype=np.float32)
 witness_out = np.asarray(witness_out, dtype=np.float32)
 gps_out = np.asarray(gps_out, dtype=np.float64)

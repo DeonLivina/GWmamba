@@ -1,15 +1,10 @@
 #!/usr/bin/env python3
 """Extract & whiten real glitch windows from big_model's layout, prioritizing
-10,000 low-frequency glitches sorted by witness match count. Strain is
-processed natively at its original sample rate without resampling, and both
-frequency and SNR values are saved to the output HDF5 files.
+low-frequency glitches sorted by witness match count.
 
 Glitch candidates come from full_data/<DETECTOR>/strain_witness_coincidence.csv
 (strain_witness_coincidence.py's output). Unlike the old O3_data pipeline,
-there's no calendar-day structure to loop over here -- the whole candidate
-table is processed in one pass, and each candidate window's strain/witness
-chunk is looked up from a per-channel manifest (chunk boundaries differ
-between strain, and between individual witness channels/detectors).
+there's no calendar-day structure to loop over here.
 
 Set DETECTOR below and rerun per detector.
 """
@@ -28,9 +23,8 @@ from gwpy.timeseries import TimeSeries
 from ml4gw.transforms import SpectralDensity, Whiten
 
 
-# -----------------------
 # Config
-# -----------------------
+
 DETECTOR = "L1"  # or "L1"
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -62,9 +56,8 @@ output_file_low = OUTPUT_DIR / "whitened_glitches.h5"
 output_file_high = OUTPUT_DIR / "whitened_high_glitches.h5"
 
 
-# -----------------------
 # Parameters
-# -----------------------
+
 window = 1.0
 target_sample_rate = 4096
 
@@ -81,15 +74,14 @@ nyquist = target_sample_rate / 2.0
 JITTER_SEED = 44
 JITTER_MARGIN = 0.02
 
-MAX_LOW_FREQ_SAMPLES = 10000
+MAX_LOW_FREQ_SAMPLES = 10000   # cap for the number of glich samples required for computatioanl efficiencey
 
-# Only keep glitches at or above this SNR.
-MIN_SNR = 7
+# Only keep glitches at or above this SNR. This value comes from Hveto logs
+MIN_SNR = 7 
 
 
-# -----------------------
 # Utilities
-# -----------------------
+
 def clean_non_numerical(data):
     data = np.asarray(data, dtype=np.float64)
     bad = ~np.isfinite(data)
@@ -292,9 +284,9 @@ def save_h5(path, strain_list, witness_list, gps_list, freq_list, snr_list, chan
     print("  witness shape:", witness_arr.shape)
 
 
-# -----------------------
+
 # Load & Filter Glitches
-# -----------------------
+
 print(f"Loading glitches for {DETECTOR}")
 glitches = pd.read_csv(glitch_csv)
 print("Total glitches loaded:", len(glitches))
@@ -351,9 +343,9 @@ for rate in all_witness_rates:
         transforms[rate] = build_transforms(rate)
 
 
-# -----------------------
+
 # Candidate windows
-# -----------------------
+
 gtime = glitches["peak_time"].values
 gfreq = glitches[freq_col].values if freq_col in glitches.columns else np.zeros(len(glitches))
 gsnr = glitches["snr"].values if "snr" in glitches.columns else np.zeros(len(glitches))

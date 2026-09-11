@@ -1,27 +1,6 @@
 #!/usr/bin/env python3
-"""Build the strain-only "blip mimic" class for big_model's layout: inject a
-config-driven SineGaussian blip (config_<DETECTOR>.yaml's `glitch:` block,
-dataset/waveforms.py's generate_glitch_sources) into REAL background strain
-ONLY, leaving the witness channels untouched (whitened real data, no
-injection) -- unlike dataset/injections.py's `_inject_glitch`, which couples
-the same blip into witness too via `derive_witness`.
-
-Why witness is deliberately left clean: a genuine instrumental glitch is
-coupled into the witness sensors (that coupling is exactly what the
-calm/disturbed / gate / cross-attention machinery elsewhere in this repo is
-meant to exploit). A blip-shaped strain transient with NO corresponding
-witness disturbance is, physically, what an astrophysical signal would look
-like if it happened to have a glitch-like time-frequency shape -- it should
-NOT be called "glitch" on strain shape alone. Feeding these in as a
-hard-negative/confusable class (real background strain + a synthetic,
-witness-decoupled blip) tests whether a classifier is actually using
-strain<->witness coincidence to call "glitch", or is shortcutting on blip
-shape in strain alone.
-
-This is the same "strain-only blip" class as new_utils/inject_glitches.py,
-but rebuilt on top of big_model's full_data/ manifest infrastructure (the
-same one inject_signal.py uses), rather than background_triggers.csv:
-
+"""
+This script does 3 things:
   1. Shuffles full_data/<DETECTOR>/whitened_background_full.h5's GPS list and
      walks it in that order, pulling the *raw* (pre-whitened) strain/witness
      data for each window straight from the strain/witness manifests (that
@@ -73,9 +52,8 @@ from injections import (
 )
 
 
-# -----------------------
 # Config
-# -----------------------
+
 DETECTOR = "L1"  # or "L1"
 
 config_path = str(DATASET_DIR / "configs" / f"config_{DETECTOR}.yaml")
@@ -120,9 +98,9 @@ print(f"Executing pipeline on device: {device}")
 torch.set_default_dtype(torch.float64)
 
 
-# -----------------------
+
 # Config & transforms
-# -----------------------
+
 config = load_config(config_path)
 
 f_min = config.general.f_min
@@ -143,9 +121,9 @@ window_size = psd_size + kernel_size + 2 * pad
 num_freqs = kernel_size // 2 + 1
 
 
-# -----------------------
-# Utilities (identical to inject_signal.py)
-# -----------------------
+
+# Utilities
+
 def clean_non_numerical(data):
     data = np.asarray(data, dtype=np.float64)
     bad = ~np.isfinite(data)
@@ -250,10 +228,8 @@ def build_witness_manifest(witness_dir, detector, channel):
         raise RuntimeError(f"No witness chunks found for {detector}:{channel} (pattern {pattern})")
     return sorted(manifest)
 
-
-# -----------------------
 # Initialization
-# -----------------------
+
 print("\nIndexing strain chunks")
 strain_manifest = load_strain_manifest(STRAIN_DIR, DETECTOR)
 print(f"Found {len(strain_manifest)} strain chunks")
@@ -272,11 +248,11 @@ for rate in all_witness_rates:
     if rate not in transforms:
         transforms[rate] = build_transforms(rate)
 
-# -----------------------
+
 # Candidate windows: drawn from the background file itself, exactly like
 # inject_signal.py -- extract_background.py already exhausted the surviving
 # candidate pool, so there's no separate "unused" list to source from.
-# -----------------------
+
 if not os.path.exists(background_v2_file):
     raise FileNotFoundError(
         f"{background_v2_file} not found -- this script sources its "

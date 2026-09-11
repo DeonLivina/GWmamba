@@ -21,7 +21,7 @@ DETECTOR = "L1"  # or "H1"
 
 ROOT = Path(__file__).resolve().parent.parent
 
-#
+
 TRIGGER_DIR = {
     "H1": ROOT / "triggers_H1",
     "L1": ROOT / "triggers_L1",

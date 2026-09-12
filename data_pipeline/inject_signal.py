@@ -1,15 +1,5 @@
 #!/usr/bin/env python3
-"""Build the "signal" class for big_model's layout: inject synthetic CBC
-waveforms into real background strain, with witness channels drawn from the
-same real data and independently whitened.
-
-Candidate windows are now drawn directly from full_data/<DETECTOR>/
-whitened_background_full.h5 rather than from background_triggers.csv. That
-background file was built from the *entire* surviving candidate pool (see
-extract_background.py), so there's no separate "unused" pool left to draw
-fresh injection candidates from -- every viable window is already sitting in
-the background file. Instead, this script:
-
+"""
   1. Shuffles the background file's GPS list and walks it in that order,
      pulling the *raw* (pre-whitened) strain/witness data for each window
      straight from the strain/witness manifests (the background file itself
@@ -57,9 +47,9 @@ from injections import (
 )
 
 
-# -----------------------
+
 # Config
-# -----------------------
+
 DETECTOR = "L1"  # or "L1"
 
 config_path = str(DATASET_DIR / "configs" / f"config_{DETECTOR}.yaml")

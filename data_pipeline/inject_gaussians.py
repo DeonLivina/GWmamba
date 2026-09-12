@@ -88,8 +88,7 @@ TARGET_RATE = 4096
 # Number of background windows to convert into strain-only-blip examples.
 N_TARGET = 2000
 
-# Distinct from inject_signal.py's CANDIDATE_SEED (43) so the two scripts
-# don't walk the shared background pool in the same shuffled order.
+
 CANDIDATE_SEED = 46
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -296,9 +295,9 @@ def _live_status():
                      whiten=skipped_whiten, witness=skipped_witness, wave=skipped_waveform)
 
 
-# -----------------------
+
 # Extraction loop
-# -----------------------
+
 for win_start, orig_gps in zip(candidates, shuffled_gps):
     if count >= N_TARGET:
         break

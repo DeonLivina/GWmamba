@@ -239,9 +239,8 @@ def sample_bootstrap_snr(pool, batch_size, rng, device):
     return torch.as_tensor(draw, dtype=torch.get_default_dtype(), device=device)
 
 
-# -----------------------
 # Initialization
-# -----------------------
+
 print("\nIndexing strain chunks")
 strain_manifest = load_strain_manifest(STRAIN_DIR, DETECTOR)
 print(f"Found {len(strain_manifest)} strain chunks")
@@ -265,9 +264,8 @@ glitch_snr_pool = load_glitch_snr_pool(glitch_h5_path)
 print(f"Glitch SNR pool: {len(glitch_snr_pool)} values")
 snr_rng = np.random.default_rng(SNR_BOOTSTRAP_SEED)
 
-# -----------------------
 # Candidate windows: drawn from the background file itself
-# -----------------------
+
 if not os.path.exists(background_v2_file):
     raise FileNotFoundError(
         f"{background_v2_file} not found -- this script now sources its "
@@ -311,9 +309,9 @@ def _live_status():
                      whiten=skipped_whiten, witness=skipped_witness, wave=skipped_waveform)
 
 
-# -----------------------
+
 # Extraction loop
-# -----------------------
+
 for win_start, orig_gps in zip(candidates, shuffled_gps):
     if count >= N_TARGET:
         break
@@ -473,9 +471,9 @@ with h5py.File(output_file, "w") as f:
 print("\nSaved:", output_file)
 
 
-# -----------------------
+
 # Remove the consumed windows from the background file
-# -----------------------
+
 print(f"\nRemoving {len(used_bg_gps)} used windows from {background_v2_file}")
 with h5py.File(background_v2_file, "r") as f:
     bg_strain = f["strain"][:]

@@ -130,11 +130,6 @@ class DualSupConCELitModule(L.LightningModule):
         x, y_type, y_det = batch
         strain, witness = x[:, :, 0:1], x[:, :, 1:]
 
-        # classify() runs the shared trunk ONCE and returns both the
-        # classifier logits (from the independent cls_temporal_pool
-        # embedding) and strain_z/witness_z (from the separate SupCon-side
-        # pooling), so nothing here needs to reconstruct an "embed" tensor
-        # or call the classifier/aux head directly anymore.
         logits, aux_logits, strain_z, witness_z = self.model.classify(strain, witness)
 
         ce_loss = F.cross_entropy(logits, y_type)

@@ -27,15 +27,6 @@ CLASS_COLOR_MAP = {
     "signal": "#2ca02c",      # Green
 }
 
-
-# =====================================================================
-# 1. CORNER PLOT GENERATION (standalone function + thin Callback wrapper)
-#
-# Kept as a plain function so it can be called manually AFTER reloading
-# the best checkpoint's weights (see main() below) -- using it only as an
-# on_train_end Callback would run it on the LAST epoch's weights, not the
-# best one.
-# =====================================================================
 @torch.no_grad()
 def generate_corner_plots(pl_module, data_loader, label_names, detector_names, out_dir="plots"):
     print("\nGenerating corner plots for projection spaces...")
@@ -112,9 +103,7 @@ def generate_corner_plots(pl_module, data_loader, label_names, detector_names, o
     print(f"Saved Witness Corner Plot -> {witness_path}")
 
 
-# =====================================================================
-# 2. LIGHTNING MODULE -- SupCon + CE (AutoSciDACT-style joint training)
-# =====================================================================
+
 class DualSupConCELitModule(L.LightningModule):
     """Total loss = ce_weight * CE(classifier_logits, y_type)
                    + aux_weight * CE(aux_strain_logits, y_type)
@@ -201,10 +190,8 @@ class DualSupConCELitModule(L.LightningModule):
             "lr_scheduler": {"scheduler": scheduler, "monitor": "val_loss"}
         }
 
-
-# =====================================================================
 # 3. MAIN SCRIPT
-# =====================================================================
+
 def main():
     train_loader, val_loader, test_loader, meta = get_dataloaders(batch_size=128)
 

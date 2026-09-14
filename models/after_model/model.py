@@ -2,9 +2,8 @@ import torch
 import torch.nn as nn
 from mamba_ssm import Mamba
 
-# =====================================================================
-# 1. CONV1D FUNNEL ENCODER (unchanged)
-# =====================================================================
+# CONV1D FUNNEL ENCODER
+
 class ConvDownBlock(nn.Module):
     def __init__(self, d_model, kernel_size=4, stride=2):
         super().__init__()
@@ -50,9 +49,9 @@ class ConvFunnelEncoder(nn.Module):
         return self.norm(x)
 
 
-# =====================================================================
+
 # 2. POOLING
-# =====================================================================
+
 class WitnessChannelAttentionPool(nn.Module):
     """Attention pool across the N witness-channel VECTORS (post-Mamba,
     post-temporal-pool) to reduce N vectors down to 1. Operates on
@@ -112,29 +111,6 @@ class BiMambaBlock(nn.Module):
         return self.proj(merged)
 
 
-# =====================================================================
-# 3. FULL MODEL -- shared-trunk architecture (single shared-weight Mamba
-# stack processes all 1+N streams via batch folding), with an optional
-# witness branch that can be fully disabled for ablation
-# (`use_witness=False`), and an optional bidirectional Mamba
-# (`bidirectional=True`) also ablatable.
-#
-# POOLING IS NOW INDEPENDENT PER BRANCH (this is the key change from the
-# earlier version): the same post-Mamba `streams_flat` tensor is pooled
-# TWICE, by two separately-parameterized TemporalPool instances:
-#
-#   - `temporal_pool` -> strain_vec / witness_vec -> strain_proj/witness_proj
-#     -> strain_z/witness_z. These proj_dim embeddings feed ONLY the SupCon
-#     losses (and the auxiliary strain-only CE head).
-#   - `cls_temporal_pool` -> per-stream d_model vectors, concatenated
-#     (flattened) across all 1+N streams -> fed DIRECTLY to the classifier,
-#     at full d_model resolution, with no dependency on strain_z/witness_z.
-#
-# This mirrors before_model.py's split between its "bypass" heads (SupCon
-# only) and its "fusion" path (classifier only) -- the difference is that
-# here both branches read the SAME shared-trunk Mamba output, whereas in
-# before_model the bypass branch never touches Mamba at all.
-# =====================================================================
 class MambaFusionSupConModel(nn.Module):
     def __init__(self, d_model=32, mamba_layers=4, d_state=16, d_conv=4, expand=2,
                  proj_dim=8, pool_method="mean", n_wit=1, n_classes=3, use_witness=True,
@@ -170,7 +146,7 @@ class MambaFusionSupConModel(nn.Module):
         self.temporal_pool = TemporalPool(d_model, method=pool_method)
         self.strain_proj = nn.Linear(d_model, proj_dim)
 
-        # --- Classifier-side pooling (independent params, no SupCon gradient) ---
+        
         self.cls_temporal_pool = TemporalPool(d_model, method=pool_method)
 
         n_streams = (1 + n_wit) if use_witness else 1
@@ -182,10 +158,6 @@ class MambaFusionSupConModel(nn.Module):
             nn.Linear(16, n_classes),
         )
 
-        # Auxiliary strain-only classifier head: CE on strain_z alone,
-        # trained alongside the main CE on the fused embedding. This is the
-        # aux-loss design from the original (pre-SupCon) model. Still reads
-        # strain_z (the SupCon-side projection), not the classifier pooling.
         self.aux_strain_head = nn.Sequential(
             nn.LayerNorm(proj_dim),
             nn.Linear(proj_dim, n_classes),

@@ -2,9 +2,7 @@
 per funnel encoder, a stack of plain mamba_ssm.Mamba blocks over the
 1+n_wit streams (folded into the batch dim, weights shared across
 streams), mean pooling, and a single linear classifier -- cross-entropy
-only, no SupCon/auxiliary heads/bypass paths. Every other lineage in this
-repo (before_model, after_model, cmamba) adds something on top of this;
-this is the floor they're all compared against.
+only
 """
 
 import torch
@@ -12,9 +10,9 @@ import torch.nn as nn
 from mamba_ssm import Mamba
 
 
-# =====================================================================
+
 # 1. CONV1D FUNNEL ENCODER
-# =====================================================================
+
 class ConvDownBlock(nn.Module):
     def __init__(self, d_model, kernel_size=4, stride=2):
         super().__init__()
@@ -59,19 +57,16 @@ class ConvFunnelEncoder(nn.Module):
         x = x.permute(0, 2, 1)  # [B, T', d_model]
         return self.norm(x)
 
-
-# =====================================================================
 # 2. POOLING
-# =====================================================================
+
 class TemporalPool(nn.Module):
     """Mean pooling over the temporal dimension: [B, T, d_model] -> [B, d_model]."""
     def forward(self, x):
         return x.mean(dim=1)
 
 
-# =====================================================================
 # 3. BASELINE MODEL
-# =====================================================================
+
 class BaselineModel(nn.Module):
     def __init__(self, d_model=32, mamba_layers=2, d_state=16, d_conv=4, expand=2,
                  n_wit=5, n_classes=3, use_witness=True):
